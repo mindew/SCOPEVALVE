@@ -22,5 +22,7 @@ void loop(){
       delay(5);
       }
    gsr_average = sum/10.0;
+   Serial.print(millis());
+   Serial.print(';');
    Serial.println(gsr_average);
 }
