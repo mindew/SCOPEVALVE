@@ -1,0 +1,29 @@
+{
+  "fitbit": {
+    "appUUID": "6fcc1198-29fa-4747-aa6e-7f516a89fe12",
+    "appType": "app",
+    "appDisplayName": "HR Query",
+    "iconFile": "resources/icon.png",
+    "wipeColor": "#607d8b",
+    "requestedPermissions": [
+      "access_heart_rate",
+      "access_activity",
+      "access_internet"
+    ],
+    "buildTargets": [
+      "higgs",
+      "meson",
+      "gemini",
+      "mira"
+    ],
+    "i18n": {
+      "en": {
+        "name": "HR Query"
+      }
+    },
+    "defaultLanguage": "en-US"
+  },
+  "devDependencies": {
+    "@fitbit/sdk": "~4.1.0"
+  }
+}
