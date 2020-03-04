@@ -4,19 +4,22 @@ import numpy as np
 from scipy import signal
 import pywt
 from feature_extraction_methods import waveform_length, mav, rms, stdev, entropy, frequencyMean, frequencyMedian, mmdf, mmnf
-
-Fs = 250
-
 import numpy as np
+
+# sampling frequency is 250, default number set by Cyton Board
+Fs = 250
 
 streams, fileheader = pyxdf.load_xdf('valve_02262020_trial5_openbci.xdf')
  #retrieve time_series and time_stamps
+
+ # time_series = data with two columns, [EMG0, EMG1]
+ # time_stamps = timestamp
 index = 1
 time_series = []
 time_stamps = []
 for ix,stream in enumerate(streams):
-	#print(ix)
-	#print(stream)
+	#ix = 0 indicates the type of the streamline
+	
 	if(ix is 0):
 		time_series0 = stream['time_series']
 		time_stamps0 = stream['time_stamps']
@@ -36,9 +39,20 @@ for ix,stream in enumerate(streams):
 		time_stamps2 = stream['time_stamps']
 
 BandB,BandA = signal.butter(1,[.1,30],'bandpass',fs=Fs,output='ba')
+ # return butterworth digital filter coeff(1st order, [critical frequency], passtype, 
+ # sampling frequency, output type - numerator / denominator)
+
+ # apply low pass filter (one dimension only)
+ # acquired numerator coeff, denominator coeff, array
 EMG0 = signal.lfilter(BandB,BandA,time_series0[:,0])
 EMG1 = signal.lfilter(BandB,BandA,time_series0[:,1])
+# EMG0 = Zygomaticus --> frowning
+# EMG1 = 
+
+# parsing each column to 1by1 vector
 EMG0,EMG1,time_stamps0 = EMG0[1900::],EMG1[1900::],time_stamps0[1900::]
+
+# calculate average, standard deviation for EMG0
 baselineAVG0 = np.mean(EMG0)
 baselineSTD0 = np.std(EMG0)
 baselineAVG1 = np.mean(EMG1)
@@ -55,7 +69,7 @@ feature0List = []
 feature1List = []
 timeList = []
 
-for i in range(0,len(EMG1)):
+"""for i in range(0,len(EMG1)):
 	if(inWindow and ((EMG0[i] < threshold0 or EMG0[i] > threshold2) or (EMG1[i] < threshold1 or EMG1[i] > threshold3))):
 		feature0List[currentListIndex].append(EMG0[i])
 		feature1List[currentListIndex].append(EMG1[i])
@@ -70,7 +84,10 @@ for i in range(0,len(EMG1)):
 		timeList[currentListIndex].append(time_stamps0[i])
 		feature0List[currentListIndex].append(EMG0[i])
 		feature1List[currentListIndex].append(EMG1[i])
-		inWindow = 1
+		inWindow = 1"""
+
+	for eventTime,action in zip(time_series1,time_stamps1):
+		j
 
 wavelet0List = []
 wavelet1List = []
