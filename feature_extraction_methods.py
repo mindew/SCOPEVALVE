@@ -73,4 +73,18 @@ def mmnf(frequencies,powers):
 	numFrequencies = np.sum(sqrtPowers)
 	return weightedFrequencies / numFrequencies
 
+def maxMag(rawEMG):
+	return max(rawEMG)
+
+def absMeanMag(rawEMG):
+	absEMG = np.absolute(rawEMG)
+	return np.mean(absEMG)
+
+def absIntMag(rawEMG):
+	absEMG = np.absolute(rawEMG)
+	return np.trapz(absEMG)
+
+def rawRMS(rawEMG):
+	return rms(rawEMG)
+
 

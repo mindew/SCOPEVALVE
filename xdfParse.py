@@ -3,26 +3,31 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 import pywt
-from feature_extraction_methods import waveform_length, mav, rms, stdev, entropy, frequencyMean, frequencyMedian, mmdf, mmnf
+from feature_extraction_methods import waveform_length, mav, rms, stdev, entropy, frequencyMean, frequencyMedian, mmdf, mmnf, rawRMS, maxMag, absIntMag, absMeanMag
 import numpy as np
+from bisect import bisect
 
-# sampling frequency is 250, default number set by Cyton Board
-Fs = 250
-
-streams, fileheader = pyxdf.load_xdf('valve_02262020_trial5_openbci.xdf')
- #retrieve time_series and time_stamps
-
- # time_series = data with two columns, [EMG0, EMG1]
+# time_series = data with two columns, [EMG0, EMG1]
  # time_stamps = timestamp
 index = 1
 time_series = []
 time_stamps = []
+
+Fs = 250
+
+streams, fileheader = pyxdf.load_xdf('valve_03042020_trial10_openbci.xdf')
+
 for ix,stream in enumerate(streams):
 	#ix = 0 indicates the type of the streamline
-	
+
 	if(ix is 0):
 		time_series0 = stream['time_series']
 		time_stamps0 = stream['time_stamps']
+        # figure out if stream is keyboard or femg
+		if type(time_series0[0][0]) == str:
+			keyboard_series = time_series0
+		else:
+			femg_series = time_series0
 		#Uncomment the below lines if you want to convert ms to seconds or minutes
 		#time_columns = np.true_divide(time_stamps0,3600)
 		#for time_stamp in time_stamps0:
@@ -31,12 +36,27 @@ for ix,stream in enumerate(streams):
 	elif(ix is 1):
 		time_series1 = stream['time_series']
 		time_stamps1 = stream['time_stamps']
+        # figure out if stream is keyboard or femg
+		if type(time_series1[0][0]) == str:
+			keyboard_series = time_series1
+		else:
+			femg_series = time_series1
 		#time_points = np.true_divide(time_stamps1,3600)
 		#plt.plot(time_stamps1,time_series1[:,0])
 		#plt.plot(time_stamps1,time_series1[:,1])
-	elif(ix is 2):
-		time_series2 = stream['time_series']
-		time_stamps2 = stream['time_stamps']
+	# elif(ix is 2):
+	# 	time_series2 = stream['time_series']
+	# 	time_stamps2 = stream['time_stamps']
+
+# pick out series and timestamps of when space is pressed
+space_series = []
+space_timestamps = []
+for i in range(0,len(keyboard_series)):
+	if keyboard_series[i][0] == "SPACE pressed":
+		space_series.append(keyboard_series[i][0])
+		space_timestamps.append(time_stamps0[i])
+
+print(space_timestamps)
 
 BandB,BandA = signal.butter(1,[.1,30],'bandpass',fs=Fs,output='ba')
  # return butterworth digital filter coeff(1st order, [critical frequency], passtype, 
@@ -52,22 +72,15 @@ EMG1 = signal.lfilter(BandB,BandA,time_series0[:,1])
 # parsing each column to 1by1 vector
 EMG0,EMG1,time_stamps0 = EMG0[1900::],EMG1[1900::],time_stamps0[1900::]
 
-# calculate average, standard deviation for EMG0
-baselineAVG0 = np.mean(EMG0)
-baselineSTD0 = np.std(EMG0)
-baselineAVG1 = np.mean(EMG1)
-baselineSTD1 = np.std(EMG1)
-threshold0 = baselineAVG0 - 3*baselineSTD0
-threshold1 = baselineAVG1 - 3*baselineSTD1
-threshold2 = baselineAVG0 + 3*baselineSTD0
-threshold3 = baselineAVG1 + 3*baselineSTD1
-print()
-
 inWindow = 0
 currentListIndex = 0
 feature0List = []
 feature1List = []
 timeList = []
+
+feature0List.append(EMG0[7500:7999])
+feature1List.append(EMG1[7500:7999])
+timeList.append(time_stamps0[7500:7999])
 
 """for i in range(0,len(EMG1)):
 	if(inWindow and ((EMG0[i] < threshold0 or EMG0[i] > threshold2) or (EMG1[i] < threshold1 or EMG1[i] > threshold3))):
@@ -86,8 +99,44 @@ timeList = []
 		feature1List[currentListIndex].append(EMG1[i])
 		inWindow = 1"""
 
-	for eventTime,action in zip(time_series1,time_stamps1):
-		j
+flagDone = 0
+ind = 0
+
+while ind < len(space_timestamps)-1:
+	nextInd = ind+1
+	currInd = ind
+	while(space_timestamps[nextInd]>np.add(space_timestamps[currInd],2)):
+		currInd = nextInd
+		nextInd = currInd+1
+		if(nextInd > len(space_timestamps) or currInd > len(space_timestamps)):
+			flagDone = 1
+			break
+	if(flagDone and (space_timestamps[currInd]+2 <= time_stamps0[len(time_stamps0)-1])):
+		startInd = bisect(time_stamps0,space_timestamps[ind])
+		endInd = bisect(time_stamps0,space_timestamps[ind])+499
+		timeList.append(time_stamps0[startInd:endInd])
+		feature0List.append(EMG0[startInd:endInd])
+		feature1List.append(EMG1[startInd:endInd])
+		flagDone = 0
+	elif(flagDone):
+		startInd = bisect(time_stamps0,space_timestamps[ind])
+		timeList.append(time_stamps0[startInd:])
+		feature0List.append(EMG0[startInd:])
+		feature1List.append(EMG1[startInd:])
+		flagDone = 0
+	else:
+		if(ind is currInd):
+			startInd = bisect(time_stamps0,space_timestamps[ind])
+			endInd = startInd + 499
+		else: 
+			startInd = bisect(time_stamps0,space_timestamps[ind])
+			endInd = bisect(time_stamps0,space_timestamps[currInd])
+		timeList.append(time_stamps0[startInd:endInd])
+		feature0List.append(EMG0[startInd:endInd])
+		feature1List.append(EMG1[startInd:endInd])
+	ind = nextInd
+
+#print(feature0List)
 
 wavelet0List = []
 wavelet1List = []
@@ -105,9 +154,31 @@ mmdf0List = []
 mmdf1List = []
 mmnf0List = []
 mmnf1List = []
+maxMag0List = []
+maxMag1List = []
+absMeanMag0List = []
+absMeanMag1List = []
+absIntMag0List = []
+absIntMag1List = []
+rawRMS0List = []
+rawRMS1List = []
+
 
 #apply window
 for (feature0,feature1) in zip(feature0List,feature1List):
+	#raw EMG feature extraction
+	#maximum magnitude calculation
+	maxMag0List.append(maxMag(feature0))
+	maxMag1List.append(maxMag(feature1))
+	#mean of absolute value of raw emg
+	absMeanMag0List.append(absMeanMag(feature0))
+	absMeanMag1List.append(absMeanMag(feature1))
+	#integral of absolute value of raw emg
+	absIntMag0List.append(absIntMag(feature0))
+	absIntMag1List.append(absIntMag(feature1))
+	#RMS of raw EMG
+	rawRMS0List.append(rawRMS(feature0))
+	rawRMS1List.append(rawRMS(feature1))
 	#wavelet generation
 	blackman = signal.windows.blackman(len(feature0))
 	feature0 = [a*b for a,b in zip(feature0,blackman)]
@@ -175,7 +246,7 @@ i = 0
 
 fig, axs = plt.subplots(3,3)
 
-zeroA6List = [event[0] for event in length0List]
+"""zeroA6List = [event[0] for event in length0List]
 zeroD6List = [event[1] for event in length0List]
 zeroD5List = [event[2] for event in length0List]
 zeroD4List = [event[3] for event in length0List]
@@ -189,26 +260,35 @@ oneD5List = [event[2] for event in length1List]
 oneD4List = [event[3] for event in length1List]
 oneD3List = [event[4] for event in length1List]
 oneD2List = [event[5] for event in length1List]
-oneD1List = [event[6] for event in length1List]
+oneD1List = [event[6] for event in length1List]"""
 
-ran = range(len(zeroA6List))
-axs[2,2].scatter(range(len(oneD6List[:-1])),zeroD6List[:-1],color="r")
-axs[2,2].scatter(range(len(oneD6List[:-1])),oneD6List[:-1],color="b")
-axs[2,2].scatter(len(oneD6List),oneD6List[len(oneD6List)-1],color="g")
+axs[2,2].scatter(range(1,len(maxMag0List)),maxMag0List[1:],color="r")
+axs[2,2].scatter(0,maxMag0List[0],color="b")
 
-axs[2,1].scatter(range(len(oneD5List[:-1])),zeroD5List[:-1],color="r")
-axs[2,1].scatter(range(len(oneD5List[:-1])),oneD5List[:-1],color="b")
-axs[2,1].scatter(len(oneD5List),oneD5List[len(oneD5List)-1],color="g")
+axs[2,1].scatter(range(1,len(maxMag1List)),maxMag1List[1:],color="r")
+axs[2,1].scatter(0,maxMag1List[0],color="b")
 
-axs[2,0].scatter(range(len(oneD4List[:-1])),zeroD4List[:-1],color="r")
+axs[1,2].scatter(range(1,len(absMeanMag0List)),absMeanMag0List[1:],color="r")
+axs[1,2].scatter(0,absMeanMag0List[0],color="b")
+
+axs[1,1].scatter(range(1,len(absMeanMag1List)),absMeanMag1List[1:],color="r")
+axs[1,1].scatter(0,absMeanMag1List[0],color="b")
+
+axs[0,2].scatter(range(1,len(rawRMS0List)),rawRMS0List[1:],color="r")
+axs[0,2].scatter(0,rawRMS0List[0],color="b")
+
+axs[0,1].scatter(range(1,len(rawRMS1List)),rawRMS1List[1:],color="r")
+axs[0,1].scatter(0,rawRMS1List[0],color="b")
+
+"""axs[1,2].scatter(range(len(oneD4List[:-1])),zeroD4List[:-1],color="r")
 axs[2,0].scatter(range(len(oneD4List[:-1])),oneD4List[:-1],color="b")
-axs[2,0].scatter(len(oneD4List),oneD4List[len(oneD4List)-1],color="g")
+axs[2,0].scatter(len(oneD4List),oneD4List[len(oneD4List)-1],color="g")"""
 
 #plt.plot(rmsEMG1)
-for time,event in zip(time_stamps1,time_series1):
+for time in space_timestamps:
+	axs[0,0].axvline(x=time,color='b')
 	axs[1,0].axvline(x=time,color='b')
-	axs[1,1].axvline(x=time,color='b')
-	axs[1,2].axvline(x=time,color='b')
+	axs[2,0].axvline(x=time,color='b')
 """if(event[0] is 'UP pressed'):
 		print(HI)
 		plt.axvline(x=time,color='r')
@@ -221,26 +301,15 @@ for time,event in zip(time_stamps1,time_series1):
 	elif(event[0] is 'SPACE pressed'):
 		plt.axvline(x=time,color='c')"""
 for time, feature0, feature1 in zip(timeList,feature0List,feature1List):
-	axs[1,0].plot(time,feature0,c="r")
-	axs[1,1].plot(time,feature1,c="g")
-	axs[1,2].plot(time,feature0,c="r")
-	axs[1,2].plot(time,feature1,c="g")
+	axs[0,0].plot(time,feature0,c="r")
+	axs[1,0].plot(time,feature1,c="g")
+	axs[2,0].plot(time,feature0,c="r")
+	axs[2,0].plot(time,feature1,c="g")
 
 axs[0,0].plot(time_stamps0,EMG0)
-axs[0,1].plot(time_stamps0,EMG1)
-axs[0,0].hlines(threshold0,xmin = min(time_stamps0),xmax = max(time_stamps0))
-axs[0,1].hlines(threshold1,xmin = min(time_stamps0),xmax = max(time_stamps0))
-axs[0,0].hlines(threshold2,xmin = min(time_stamps0),xmax = max(time_stamps0))
-axs[0,1].hlines(threshold3,xmin = min(time_stamps0),xmax = max(time_stamps0))
-
-axs[1,0].hlines(threshold0,xmin = min(time_stamps0),xmax = max(time_stamps0))
-axs[1,1].hlines(threshold1,xmin = min(time_stamps0),xmax = max(time_stamps0))
-axs[1,0].hlines(threshold2,xmin = min(time_stamps0),xmax = max(time_stamps0))
-axs[1,1].hlines(threshold3,xmin = min(time_stamps0),xmax = max(time_stamps0))
-axs[1,2].hlines(threshold0,xmin = min(time_stamps0),xmax = max(time_stamps0),colors="r")
-axs[1,2].hlines(threshold1,xmin = min(time_stamps0),xmax = max(time_stamps0),colors="g")
-axs[1,2].hlines(threshold2,xmin = min(time_stamps0),xmax = max(time_stamps0),colors="r")
-axs[1,2].hlines(threshold3,xmin = min(time_stamps0),xmax = max(time_stamps0),colors="g")
+axs[1,0].plot(time_stamps0,EMG1)
+axs[2,0].plot(time_stamps0,EMG0)
+axs[2,0].plot(time_stamps0,EMG1)
 #plt.plot(time_stamps0,hEMG0)
 #plt.plot(time_stamps0,hEMG1)
 plt.show()
