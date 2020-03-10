@@ -15,8 +15,15 @@ time_stamps = []
 
 Fs = 250
 
+fig1,axs1 = plt.subplots(2,2)
+
 streams, fileheader = pyxdf.load_xdf('valve_03042020_trial10_openbci.xdf')
 
+ # time_series = data with two columns, [EMG0, EMG1]
+ # time_stamps = timestamp
+index = 1
+time_series = []
+time_stamps = []
 for ix,stream in enumerate(streams):
 	#ix = 0 indicates the type of the streamline
 
@@ -26,8 +33,20 @@ for ix,stream in enumerate(streams):
         # figure out if stream is keyboard or femg
 		if type(time_series0[0][0]) == str:
 			keyboard_series = time_series0
+			keyboard_timestamps = time_stamps0
 		else:
 			femg_series = time_series0
+			femg_timestamps = time_stamps0
+		axs1[0,0].plot(time_stamps0,time_series0)
+		BandB,BandA = signal.butter(1,[5,50],'bandpass',fs=Fs,output='ba')
+		NotchB,NotchA = signal.iirnotch(60,1,fs=Fs)
+		EMG0 = signal.lfilter(BandB,BandA,time_series0[:,0])
+		EMG1 = signal.lfilter(BandB,BandA,time_series0[:,1])
+		EMG0 = signal.lfilter(NotchB,NotchA,EMG0)
+		EMG1 = signal.lfilter(NotchB,NotchA,EMG1)
+
+		axs1[1,0].plot(time_stamps0,EMG0)
+		axs1[1,0].plot(time_stamps0,EMG1)
 		#Uncomment the below lines if you want to convert ms to seconds or minutes
 		#time_columns = np.true_divide(time_stamps0,3600)
 		#for time_stamp in time_stamps0:
@@ -39,14 +58,16 @@ for ix,stream in enumerate(streams):
         # figure out if stream is keyboard or femg
 		if type(time_series1[0][0]) == str:
 			keyboard_series = time_series1
+			keyboard_timestamps = time_stamps1
 		else:
 			femg_series = time_series1
+			femg_timestamps = time_stamps1
 		#time_points = np.true_divide(time_stamps1,3600)
 		#plt.plot(time_stamps1,time_series1[:,0])
 		#plt.plot(time_stamps1,time_series1[:,1])
 	# elif(ix is 2):
 	# 	time_series2 = stream['time_series']
-	# 	time_stamps2 = stream['time_stamps']
+	# 	time_stamps2 = stream['time_stamps']"""
 
 # pick out series and timestamps of when space is pressed
 space_series = []
@@ -54,11 +75,18 @@ space_timestamps = []
 for i in range(0,len(keyboard_series)):
 	if keyboard_series[i][0] == "SPACE pressed":
 		space_series.append(keyboard_series[i][0])
-		space_timestamps.append(time_stamps0[i])
+		space_timestamps.append(keyboard_timestamps[i])
+
+# relative time of spacebar press to beginning of trial
+space_relstamps = []
+for i in range(0,len(space_timestamps)):
+	space_relstamps.append(space_timestamps[i]-femg_timestamps[0])
 
 print(space_timestamps)
 
-BandB,BandA = signal.butter(1,[.1,30],'bandpass',fs=Fs,output='ba')
+#.1, 30
+BandB,BandA = signal.butter(1,[5,50],'bandpass',fs=Fs,output='ba')
+NotchB,NotchA = signal.iirnotch(60,1,fs=Fs)
  # return butterworth digital filter coeff(1st order, [critical frequency], passtype, 
  # sampling frequency, output type - numerator / denominator)
 
@@ -66,11 +94,26 @@ BandB,BandA = signal.butter(1,[.1,30],'bandpass',fs=Fs,output='ba')
  # acquired numerator coeff, denominator coeff, array
 EMG0 = signal.lfilter(BandB,BandA,time_series0[:,0])
 EMG1 = signal.lfilter(BandB,BandA,time_series0[:,1])
+
+EMG0 = signal.lfilter(NotchB,NotchA,EMG0)
+EMG1 = signal.lfilter(NotchB,NotchA,EMG1)
+
+axs1[1,0].plot(time_stamps0,EMG0)
+axs1[1,0].plot(time_stamps0,EMG1)
 # EMG0 = Zygomaticus --> frowning
 # EMG1 = 
 
 # parsing each column to 1by1 vector
-EMG0,EMG1,time_stamps0 = EMG0[1900::],EMG1[1900::],time_stamps0[1900::]
+EMG0,EMG1,time_stamps0 = EMG0[4000::],EMG1[4000::],time_stamps0[4000::]
+
+EMG0mirror = np.multiply(EMG0,-1)
+
+axs1[0,1].plot(time_stamps0,EMG0)
+axs1[0,1].plot(time_stamps0,EMG1)
+
+axs1[1,1].plot(time_stamps0,EMG0mirror)
+axs1[1,1].plot(time_stamps0,EMG1)
+
 
 inWindow = 0
 currentListIndex = 0
@@ -105,10 +148,12 @@ ind = 0
 while ind < len(space_timestamps)-1:
 	nextInd = ind+1
 	currInd = ind
-	while(space_timestamps[nextInd]>np.add(space_timestamps[currInd],2)):
+	if(nextInd >= len(space_timestamps) or currInd >= len(space_timestamps)):
+		break
+	while(space_timestamps[nextInd]<np.add(space_timestamps[currInd],2)):
 		currInd = nextInd
 		nextInd = currInd+1
-		if(nextInd > len(space_timestamps) or currInd > len(space_timestamps)):
+		if(nextInd >= len(space_timestamps) or currInd >= len(space_timestamps)):
 			flagDone = 1
 			break
 	if(flagDone and (space_timestamps[currInd]+2 <= time_stamps0[len(time_stamps0)-1])):
@@ -131,6 +176,8 @@ while ind < len(space_timestamps)-1:
 		else: 
 			startInd = bisect(time_stamps0,space_timestamps[ind])
 			endInd = bisect(time_stamps0,space_timestamps[currInd])
+		print("START IND:")
+		print(space_timestamps[ind])
 		timeList.append(time_stamps0[startInd:endInd])
 		feature0List.append(EMG0[startInd:endInd])
 		feature1List.append(EMG1[startInd:endInd])
@@ -264,32 +311,41 @@ oneD1List = [event[6] for event in length1List]"""
 
 axs[2,2].scatter(range(1,len(maxMag0List)),maxMag0List[1:],color="r")
 axs[2,2].scatter(0,maxMag0List[0],color="b")
+axs[2,2].set_title("Maximum Magnitude of EMG 0")
 
 axs[2,1].scatter(range(1,len(maxMag1List)),maxMag1List[1:],color="r")
 axs[2,1].scatter(0,maxMag1List[0],color="b")
+axs[2,1].set_title("Maximum Magnitude of EMG 1")
 
 axs[1,2].scatter(range(1,len(absMeanMag0List)),absMeanMag0List[1:],color="r")
 axs[1,2].scatter(0,absMeanMag0List[0],color="b")
+axs[1,2].set_title("Mean of Absolute Value of EMG 0")
 
 axs[1,1].scatter(range(1,len(absMeanMag1List)),absMeanMag1List[1:],color="r")
 axs[1,1].scatter(0,absMeanMag1List[0],color="b")
+axs[1,1].set_title("Mean of Absolute Value of EMG 1")
 
 axs[0,2].scatter(range(1,len(rawRMS0List)),rawRMS0List[1:],color="r")
 axs[0,2].scatter(0,rawRMS0List[0],color="b")
+axs[0,2].set_title("Root Mean Square of EMG 0")
 
 axs[0,1].scatter(range(1,len(rawRMS1List)),rawRMS1List[1:],color="r")
 axs[0,1].scatter(0,rawRMS1List[0],color="b")
+axs[0,1].set_title("Root Mean Square of EMG 1")
 
 """axs[1,2].scatter(range(len(oneD4List[:-1])),zeroD4List[:-1],color="r")
 axs[2,0].scatter(range(len(oneD4List[:-1])),oneD4List[:-1],color="b")
-axs[2,0].scatter(len(oneD4List),oneD4List[len(oneD4List)-1],color="g")"""
+axs[2,0].scatter(len(oneD4List),oneD4List[len(oneD4List)-1],color="g")
 
 #plt.plot(rmsEMG1)
 for time in space_timestamps:
 	axs[0,0].axvline(x=time,color='b')
+	axs[0,0].set_title("Raw EMG 0 Data")
 	axs[1,0].axvline(x=time,color='b')
+	axs[1,0].set_title("Raw EMG 1 Data")
 	axs[2,0].axvline(x=time,color='b')
-"""if(event[0] is 'UP pressed'):
+	axs[2,0].set_title("Raw EMG 0 and 1 Data")
+if(event[0] is 'UP pressed'):
 		print(HI)
 		plt.axvline(x=time,color='r')
 	elif(event[0] is 'RIGHT pressed'):
@@ -299,12 +355,12 @@ for time in space_timestamps:
 		print(HI)
 		plt.axvline(x=time,color='g')
 	elif(event[0] is 'SPACE pressed'):
-		plt.axvline(x=time,color='c')"""
+		plt.axvline(x=time,color='c')
 for time, feature0, feature1 in zip(timeList,feature0List,feature1List):
 	axs[0,0].plot(time,feature0,c="r")
 	axs[1,0].plot(time,feature1,c="g")
 	axs[2,0].plot(time,feature0,c="r")
-	axs[2,0].plot(time,feature1,c="g")
+	axs[2,0].plot(time,feature1,c="g")"""
 
 axs[0,0].plot(time_stamps0,EMG0)
 axs[1,0].plot(time_stamps0,EMG1)
