@@ -6,6 +6,12 @@ import pywt
 from feature_extraction_methods import waveform_length, mav, rms, stdev, entropy, frequencyMean, frequencyMedian, mmdf, mmnf, rawRMS, maxMag, absIntMag, absMeanMag
 import numpy as np
 from bisect import bisect
+import pandas as pd
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import f_classif
+import seaborn as sns
+# feature selection uses the ANOVA F-value
+
 
 # time_series = data with two columns, [EMG0, EMG1]
  # time_stamps = timestamp
@@ -17,7 +23,11 @@ Fs = 250
 
 fig1,axs1 = plt.subplots(2,2)
 
-streams, fileheader = pyxdf.load_xdf('valve_03042020_trial10_openbci.xdf')
+# print('what is the file name?')
+# file_name = input()
+# valve_03042020_trial10_openbci.xdf
+
+streams, fileheader = pyxdf.load_xdf("valve_03042020_trial10_openbci.xdf")
 
  # time_series = data with two columns, [EMG0, EMG1]
  # time_stamps = timestamp
@@ -82,7 +92,43 @@ space_relstamps = []
 for i in range(0,len(space_timestamps)):
 	space_relstamps.append(space_timestamps[i]-femg_timestamps[0])
 
+#printing times that are interrupted
 print(space_timestamps)
+
+baseline = []
+event_emg = []
+timecurr = 0
+columncurr = 0
+# extract baseline data 
+# for i in range(0,len(time_stamps1)):
+# 	if (time_curr>=1) && (time_stamps1[timecurr] == space_timestamps):
+# 		# the data is not baseline but significant
+# 		timecurr = timecurr + 1
+# 		columncurr = columncurr + 1
+# 		# stop the loop 
+# 		# store the EMG data and move to the next column
+# 	elif (time_curr==0):
+# 		if (time_stamps1[timecurr] == space_timestamps):
+# 			# the data is baseline 
+# 			timecurr = timecurr + 1
+# 		else: 
+# 			baseline.append()
+
+
+# 	else 
+# 		event_emg.append()
+
+
+## pseudocode:
+# save the EMG data up until the first timestamp
+# that's the baseline
+# get the list of EMG data based on the extracted timestamps
+# correlate the list of data with the target (baseline)
+# generate the heatmap
+
+
+
+
 
 #.1, 30
 BandB,BandA = signal.butter(1,[5,50],'bandpass',fs=Fs,output='ba')
@@ -101,7 +147,7 @@ EMG1 = signal.lfilter(NotchB,NotchA,EMG1)
 axs1[1,0].plot(time_stamps0,EMG0)
 axs1[1,0].plot(time_stamps0,EMG1)
 # EMG0 = Zygomaticus --> frowning
-# EMG1 = 
+# EMG1 = Cheek --> smiling
 
 # parsing each column to 1by1 vector
 EMG0,EMG1,time_stamps0 = EMG0[4000::],EMG1[4000::],time_stamps0[4000::]
@@ -121,9 +167,42 @@ feature0List = []
 feature1List = []
 timeList = []
 
-feature0List.append(EMG0[7500:7999])
-feature1List.append(EMG1[7500:7999])
-timeList.append(time_stamps0[7500:7999])
+
+#############################################
+# feature importance?
+# feature0List.append(EMG0[7500:7999])
+# feature1List.append(EMG1[7500:7999])
+# timeList.append(time_stamps0[7500:7999])
+
+
+# feature_ranked0 = SelectKBest(f_classif).fit_transform(feature0List, timeList)
+# dfscores = pd.DataFrame(feature_ranked0.scores_)
+# dfcolumns = pd.DataFrame(feature0List)
+
+# featureScores = pd.concat([dfcolumns, dfscores], axis = 1)
+# featureScores.columns = ['feature','Score']
+# print(featureScores.nlargest(10,'Score'))
+#############################################
+#############################################
+
+data = pd.read_csv("train.csv")
+X = data.iloc[:,0:20]	# data
+y = data.iloc[:,-1]		# target
+
+corrmat = data.corr()
+top_corr_features = corrmat.index
+plt.figure(figsize = (20, 20))
+g = sns.heatmap(data[top_corr_features].corr(), annot=True, cmap="RdYlGn")
+
+# convert corrmat (dataframe) to numpy array or transpose the data
+# for index,row in corrmat.iterrows():
+# 	print(index)
+# 	if (row[index] >= 0.5) and (row[index] < 1.0):
+# 		print("highly correlated value is")
+# 		print(row[index])
+	
+
+#############################################
 
 """for i in range(0,len(EMG1)):
 	if(inWindow and ((EMG0[i] < threshold0 or EMG0[i] > threshold2) or (EMG1[i] < threshold1 or EMG1[i] > threshold3))):
@@ -245,7 +324,6 @@ for (feature0,feature1) in zip(feature0List,feature1List):
 	mmdf1List.append(mmdf(Pxx1))
 	mmnf0List.append(mmnf(f0,Pxx0))
 	mmnf1List.append(mmnf(f1,Pxx1))
-	
 
 length0List = []
 length1List = []
