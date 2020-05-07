@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 import pywt
-from feature_extraction_methods import merge_event_lists,waveform_length, rms, stdev, entropy, frequencyMean, frequencyMedian, mmdf, mmnf, rawRMS, maxMag, absIntMag, absMeanMag
+from feature_extraction_methods import merge_event_lists,waveform_length, rms, stdev, frequencyMean, frequencyMedian, mmdf, mmnf, rawRMS, maxMag, absIntMag, absMeanMag, calculate_entropy
 import numpy as np
 from bisect import bisect
 import csv
@@ -13,7 +13,7 @@ Fs = 250
 
 #Load data from the file
 #INPUT THE NAME OF YOUR XDF FILE HERE:
-streams, fileheader = pyxdf.load_xdf('valve_04162020_trial18_openbci.xdf')
+streams, fileheader = pyxdf.load_xdf('valve_03132020_trial15_openbci.xdf')
 
 # time_series = data with two columns, [EMG0, EMG1]
 # time_stamps = timestamp
@@ -170,7 +170,7 @@ while ind < len(rest_series)-1:
 	loopTriggered = 0
 	#if there are a minimum of two consecutive down presses and the event segment space is available,
 	#this should be a positive emotional event
-	if(rest_series[ind] == 'DOWN pressed' and rest_series[ind+1] == 'DOWN pressed' and (femg_relstamps[bisect(femg_relstamps,rest_relstamps[ind])] in femg_relstamps_available)):
+	if(rest_series[ind] == 'DOWN pressed' and (femg_relstamps[bisect(femg_relstamps,rest_relstamps[ind])] in femg_relstamps_available)):
 		startInd = bisect(femg_relstamps_available,rest_relstamps[ind])
 		endInd = startInd
 		ind += 1
@@ -264,6 +264,20 @@ std1D4List = []
 std1D3List = []
 std1D2List = []
 std1D1List = []
+ent0A6List = []
+ent0D6List = []
+ent0D5List = []
+ent0D4List = []
+ent0D3List = []
+ent0D2List = []
+ent0D1List = []
+ent1A6List = []
+ent1D6List = []
+ent1D5List = []
+ent1D4List = []
+ent1D3List = []
+ent1D2List = []
+ent1D1List = []
 
 #for each of the events perform feature extraction
 for (feature0,feature1) in zip(mergeEMG0,mergeEMG1):
@@ -287,7 +301,9 @@ for (feature0,feature1) in zip(mergeEMG0,mergeEMG1):
 		waveformLength1List.append(waveform_length(feature1))
 		#wavelet generation
 		c0A6,c0D6,c0D5,c0D4,c0D3,c0D2,c0D1 = pywt.wavedec(feature0, w, level=6)
+		wavelets0 = c0A6,c0D6,c0D5,c0D4,c0D3,c0D2,c0D1
 		c1A6,c1D6,c1D5,c1D4,c1D3,c1D2,c1D1 = pywt.wavedec(feature1, w, level=6)
+		wavelets1 = c1A6,c1D6,c1D5,c1D4,c1D3,c1D2,c1D1 
 		#stdev
 		std0A6,std0D6,std0D5,std0D4,std0D3,std0D2,std0D1 = stdev(c0A6),stdev(c0D6),stdev(c0D5),stdev(c0D4),stdev(c0D3),stdev(c0D2),stdev(c0D1)
 		std1A6,std1D6,std1D5,std1D4,std1D3,std1D2,std1D1 = stdev(c1A6),stdev(c1D6),stdev(c1D5),stdev(c1D4),stdev(c1D3),stdev(c1D2),stdev(c1D1)
@@ -305,15 +321,26 @@ for (feature0,feature1) in zip(mergeEMG0,mergeEMG1):
 		std1D3List.append(std1D3)
 		std1D2List.append(std1D2)
 		std1D1List.append(std1D1)
-		#entropy - not using this but it's implemented
-		entropy0List.append(entropy(wavelet0))
-		entropy1List.append(entropy(wavelet1))
-		#create a list of wavelets based on the list of events
-		wavelet0List.append(wavelet0)
-		wavelet1List.append(wavelet1)
+		#entropy
+		ent0A6,ent0D6,ent0D5,ent0D4,ent0D3,ent0D2,ent0D1 = calculate_entropy(c0A6),calculate_entropy(c0D6),calculate_entropy(c0D5),calculate_entropy(c0D4),calculate_entropy(c0D3),calculate_entropy(c0D2),calculate_entropy(c0D1)
+		ent1A6,ent1D6,ent1D5,ent1D4,ent1D3,ent1D2,ent1D1 = calculate_entropy(c1A6),calculate_entropy(c1D6),calculate_entropy(c1D5),calculate_entropy(c1D4),calculate_entropy(c1D3),calculate_entropy(c1D2),calculate_entropy(c1D1)
+		ent0A6List.append(ent0A6)
+		ent0D6List.append(ent0D6)
+		ent0D5List.append(ent0D5)
+		ent0D4List.append(ent0D4)
+		ent0D3List.append(ent0D3)
+		ent0D2List.append(ent0D2)
+		ent0D1List.append(ent0D1)
+		ent1A6List.append(ent1A6)
+		ent1D6List.append(ent1D6)
+		ent1D5List.append(ent1D5)
+		ent1D4List.append(ent1D4)
+		ent1D3List.append(ent1D3)
+		ent1D2List.append(ent1D2)
+		ent1D1List.append(ent1D1)
 		#PSD generation
-		f0, Pxx0 = signal.welch(feature0, Fs)
-		f1, Pxx1 = signal.welch(feature1, Fs)
+		f0, Pxx0 = signal.welch(feature0, Fs,nfft=256)
+		f1, Pxx1 = signal.welch(feature1, Fs,nfft=256)
 		#frequency mean
 		frequencyMean0List.append(frequencyMean(f0,Pxx0))
 		frequencyMean1List.append(frequencyMean(f1,Pxx1))
@@ -329,41 +356,15 @@ for (feature0,feature1) in zip(mergeEMG0,mergeEMG1):
 
 #write CSV file with all of the feature extracted events
 #there are two files, one for each facial EMG data stream
-wtr0 = csv.writer(open('testSet0.csv','w'),delimiter = ',',lineterminator = '\n')
-wtr0.writerow(maxMag0List)
-wtr0.writerow(absMeanMag0List)
-wtr0.writerow(absIntMag0List)
-wtr0.writerow(rawRMS0List)
-wtr0.writerow(waveformLength0List)
-wtr0.writerow(frequencyMean0List)
-wtr0.writerow(frequencyMedian0List)
-wtr0.writerow(mmdf0List)
-wtr0.writerow(mmnf0List)
-wtr0.writerow(std0A6List)
-wtr0.writerow(std0D6List)
-wtr0.writerow(std0D5List)
-wtr0.writerow(std0D4List)
-wtr0.writerow(std0D3List)
-wtr0.writerow(std0D2List)
-wtr0.writerow(std0D1List)
+bufsize = 1
+file0 = open('testSet0.csv','w',bufsize)
+wtr0 = csv.writer(file0)
+wtr0.writerows([maxMag0List,absMeanMag0List,absIntMag0List,rawRMS0List,waveformLength0List,frequencyMean0List,frequencyMedian0List,mmdf0List,mmnf0List,std0A6List,std0D6List,std0D5List,std0D4List,std0D3List,std0D2List,std0D1List,ent0A6List,ent0D6List,ent0D5List,ent0D4List,ent0D3List,ent0D2List,ent0D1List])
 
-wtr1 = csv.writer(open('testSet1.csv','w'),delimiter = ',',lineterminator = '\n')
-wtr1.writerow(maxMag1List)
-wtr1.writerow(absMeanMag1List)
-wtr1.writerow(absIntMag1List)
-wtr1.writerow(rawRMS1List)
-wtr1.writerow(waveformLength1List)
-wtr1.writerow(frequencyMean1List)
-wtr1.writerow(frequencyMedian1List)
-wtr1.writerow(mmdf1List)
-wtr1.writerow(mmnf1List)
-wtr1.writerow(std1A6List)
-wtr1.writerow(std1D6List)
-wtr1.writerow(std1D5List)
-wtr1.writerow(std1D4List)
-wtr1.writerow(std1D3List)
-wtr1.writerow(std1D2List)
-wtr1.writerow(std1D1List)
+file1 = open('testSet1.csv','w',bufsize)
+wtr1 = csv.writer(file1)
+wtr1.writerows([maxMag1List,absMeanMag1List,absIntMag1List,rawRMS1List,waveformLength1List,frequencyMean1List,frequencyMedian1List,mmdf1List,mmnf1List,std1A6List,std1D6List,std1D5List,std1D4List,std1D3List,std1D2List,std1D1List,ent1A6List,ent1D6List,ent1D5List,ent1D4List,ent1D3List,ent1D2List,ent1D1List])
+
 
 #a third csv file labels each event as either positive emotional (down)
 #negative emotional (space) or baseline non-emotional (baseline)

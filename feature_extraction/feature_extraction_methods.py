@@ -1,6 +1,8 @@
 import numpy as np
 import math
 import pywt
+import scipy 
+import collections
 
 Fs = 250
 
@@ -18,7 +20,6 @@ def merge_event_lists(space0,space1,space_times,down0,down1,down_times,baseline0
 	i = j = k = 0
 	print(lenSpace,lenDown,lenBaseline)
 	while i < lenSpace and j < lenDown and k < lenBaseline:
-		print(i,j,k)
 		if(space_times[i][0] < down_times[j][0] and space_times[i][0] < baseline_times[k][0]):
 			outEvent0List.append(space0[i])
 			outEvent1List.append(space1[i])
@@ -96,6 +97,15 @@ def merge_event_lists(space0,space1,space_times,down0,down1,down_times,baseline0
 		k += 1
 	return outEvent0List,outEvent1List,outTimeList,eventTypeList
 
+def calculate_entropy(data):
+    if len(data)==1:
+        S=data
+    else:
+        E=data**2/len(data)
+        P=E/sum(E)
+        S=-sum(P*np.log(P))
+    return S
+
 def rms(wavelet):
 	squaredWavelet = np.square(wavelet)
 	return math.sqrt(sum(squaredWavelet)/len(wavelet))
@@ -105,33 +115,6 @@ def stdev(wavelet):
 	minusAvgWavelet = np.subtract(wavelet,avgWavelet)
 	minusAvgSquareWavelet = np.square(minusAvgWavelet)
 	return math.sqrt(np.mean(minusAvgSquareWavelet))
-
-def entropy(wavelets):
-	meanSquaredList = []
-	meanSquaredTotal = []
-	j = 0
-	for wavelet in wavelets:
-		i = 0
-		squaredWavelet = np.square(wavelet)
-		while i<len(wavelet):
-			if(i+199 > len(wavelet)):
-				meanSquared = np.mean(squaredWavelet[i:])
-			else:
-				meanSquared = np.mean(squaredWavelet[i:i+199])
-			meanSquaredList.append(meanSquared)
-			if(j is 0 or math.floor(i/200)>=len(meanSquaredTotal)):
-				meanSquaredTotal.append(meanSquared)
-			else:
-				meanSquaredTotal[math.floor(i/200)] = meanSquaredTotal[math.floor(i/200)] + meanSquared
-			i = i+200
-		j = j + 1
-	waveEntropy = []
-	for meanSquaredEntity in meanSquaredList:
-		probs = np.divide(meanSquaredEntity,meanSquaredTotal)
-		probsSquared = np.square(probs)
-		probsLogged = np.log(probsSquared)
-		waveEntropy.append(sum(np.multiply(probsLogged,probsSquared)))
-	return waveEntropy
 
 def frequencyMean(frequencies,powers):
 	weightedFrequencies = np.sum(np.multiply(frequencies,powers))
